@@ -86,8 +86,9 @@ def main():
 			continue
 		config.set('find_eligible_runs', 'Locked', 'True')
 
-		looks_like_ks_dir = has_correct_ks_dir_form(d, logger)
-		if not looks_like_ks_dir:
+		dir_regex = re.compile(config.get('Globals','SampleRegex'))
+		looks_like_dir = has_correct_dir_form(d, dir_regex, logger)
+		if not looks_like_dir:
 			logger.info(
 				'Does not look like KidneySeq directory. Adding %s to already-downloaded file (%s).' %
 				(d, already_downloaded_f_name)
@@ -97,7 +98,8 @@ def main():
 			continue
 
 		[results_path, output_path] = set_output_results_dir(d, logger)
-		ret_code = galaxy_workflow_runner(d, output_path, logger)
+		galaxy_config = config.get('Globals','GalaxyConfig')
+		ret_code = galaxy_workflow_runner(d, output_path, galaxy_config, logger)
 		logger.info('Galaxy returned code %s for path %s' % (ret_code, d))
 
 		with open(already_run_f_name, 'a') as f:
@@ -129,29 +131,28 @@ def set_output_results_dir(input_dir, logger):
 	return [results_path, output_path]
 
 
-def galaxy_workflow_runner(input_dir, output_dir, logger):
+def galaxy_workflow_runner(input_dir, output_dir, config, logger):
 
 	galaxy_command_string = 'python workflow_runner.py %s -o %s -i %s' % (
-		input_dir, output_dir, config.get('Globals','GalaxyConfig'))
+		input_dir, output_dir, config)
 	logger.info('Attempting Galaxy run for %s. Galaxy logs written to %s' % (input_dir, output_dir))
 	ret_code = subprocess.call(galaxy_command_string, shell=True)
 
 	return ret_code
 
 
-def has_correct_ks_dir_form(dir_name, logger):
+def has_correct_dir_form(dir_name, dir_regex, logger):
 
-	# directory has form yyyymmdd-KSxx (xx is 2-digit number)
+	# directory must match regex specified in config
 	dir_name = os.path.basename(dir_name)
-	dir_regex = re.compile('[0-9]{8}-KS[0-9]{2}')
 	match = dir_regex.match(dir_name)
 	if match:
-		looks_like_ks_dir = True
+		looks_like_dir = True
 		logger.info('Directory %s looks like a KidneySeq directory.' % dir_name)
 	else:
-		looks_like_ks_dir = False
+		looks_like_dir = False
 		logger.info('Directory %s does not look like a KidneySeq directory.' % dir_name)
-	return looks_like_ks_dir
+	return looks_like_dir
 
 
 
