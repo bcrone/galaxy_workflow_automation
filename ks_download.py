@@ -27,6 +27,8 @@ def main():
 
 	# Get API Key to check history status
 	api_key = _get_api_key(config.get('Globals', 'APIKey'))
+	galaxy_host = config.get('Globals', 'GalaxyHost')
+	galaxy_config = config.get('Globals', 'GalaxyConfig')
 	
 	# Setup logger
 	logger= logging.getLogger(sys.argv[0])
@@ -78,7 +80,7 @@ def main():
 		# Download logic here
 		logger.info('Running download for sample run %s' % d)
 		# Check history status
-		(all_successful, all_running, all_failed, all_except, all_waiting, upload_history) = check_histories(d, api_key, logger)
+		(all_successful, all_running, all_failed, all_except, all_waiting, upload_history) = check_histories(d, api_key, galaxy_host, logger)
 		logger.info('Ready to download: %s - Histories running: %s - Histories failed: %s - Histories waiting: %s' % 
 			(len(all_successful), len(all_running), len(all_failed), len(all_waiting)))
 		# Skip download if not all histories have completed
@@ -86,7 +88,7 @@ def main():
 			logger.info('Not all histories ready for download. Will try again later.')
 		# Only download when all histories in JSON have completed
 		else:
-			ret_code = download_histories(d, logger)
+			ret_code = download_histories(d, galaxy_config, logger)
 			logger.info('Galaxy download returned with code %s for %s' % (ret_code, d))
 			update_lists(already_run_f_name, already_downloaded_f_name, d, logger)
 
@@ -97,8 +99,8 @@ def _get_api_key(file_name):
     return api
 
 # Group histories on Galaxy by status (successful, running, failed, except, waiting)
-def check_histories(run, api_key, logger):
-	galaxy_instance = GalaxyInstance(config.get('Globals','GalaxyHost'), key=api_key)
+def check_histories(run, api_key, host, logger):
+	galaxy_instance = GalaxyInstance(host, key=api_key)
 	history_client = HistoryClient(galaxy_instance)	
 	history_json_d = run + '/output'
 	histories = read_all_histories(history_json_d, logger)
@@ -106,10 +108,10 @@ def check_histories(run, api_key, logger):
 	return (all_successful, all_running, all_failed, all_except, all_waiting, upload_history)
 
 # Download completed histories
-def download_histories(run, logger):
+def download_histories(run, config, logger):
 	history_json_d = run + '/output'
 	download_d = run + '/results'
-	command_string = 'python history_utils.py %s download -d -o %s -i %s' % (history_json_d, download_d, config.get('Globals','GalaxyConfig'))
+	command_string = 'python history_utils.py %s download -d -o %s -i %s' % (history_json_d, download_d, config)
 	ret_code = subprocess.call(command_string, shell=True)
 	return ret_code
 
